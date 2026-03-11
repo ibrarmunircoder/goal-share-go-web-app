@@ -109,6 +109,7 @@ jobs:
       - name: Terraform Plan
         id: plan
         run: terraform plan -var-file=$TF_VAR_FILE -out="terraform.tfplan"
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
         continue-on-error: true
 
       - name: Upload Plan Artifact
