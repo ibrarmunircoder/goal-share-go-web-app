@@ -3,12 +3,16 @@ name: Infra and application deployment
 on:
   pull_request:
   push:
-    branches: [staging, production]
+    branches: [main, staging, production]
 
 jobs:
   build-push:
     name: Build and Push docker image to ECR repository
     runs-on: ubuntu-latest
+    # this is required for authenticating to AWS via the OIDC Provider we set up
+    permissions:
+      id-token: write
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -37,6 +41,10 @@ jobs:
       - build-push
     name: Test the image and run migrations locally
     runs-on: ubuntu-lates
+    # this is required for authenticating to AWS via the OIDC Provider we set up
+    permissions:
+      id-token: write
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
