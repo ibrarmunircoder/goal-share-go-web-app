@@ -5,7 +5,7 @@ cat > overrides.txt <<EOF
 {
   "containerOverrides": [
     {
-      "name": "${MIGRATION_TASK_DEFINITION_FAMILY}",
+      "name": "${CONTAINER_NAME}",
       "command": ["goose", "-dir", "migrations", "up"]
     }
   ]
@@ -16,7 +16,7 @@ TASK_ARN=$(aws ecs run-task \
 	--cluster "${CLUSTER_NAME}" \
 	--launch-type EC2 \
 	--overrides file://overrides.txt \
-	--task-definition "${SERVICE_NAME}" | jq -r '.tasks[0].taskArn')
+	--task-definition "${MIGRATION_TASK_DEFINITION_FAMILY}" | jq -r '.tasks[0].taskArn')
 
 echo "Running task: ${TASK_ARN}"
 

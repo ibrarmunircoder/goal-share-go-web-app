@@ -9,6 +9,10 @@ output "cluster_name" {
   value = module.cluser.cluster_name
 }
 
+output "container_name" {
+  value = module.cluser.container_name
+}
+
 output "service_name" {
   value = module.cluser.service_name
 }

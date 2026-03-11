@@ -279,10 +279,12 @@ jobs:
         run: |
           echo "CLUSTER_NAME=$(terraform output -raw cluster_name | cut -d ':' -f 1)" >> $GITHUB_ENV
           echo "SERVICE_NAME=$(terraform output -raw service_name | cut -d ':' -f 1)" >> $GITHUB_ENV
+          echo "CONTAINER_NAME=$(terraform output -raw container_name | cut -d ':' -f 1)" >> $GITHUB_ENV
           echo "TASK_DEFINITION_FAMILY=$(terraform output -raw task_definition_family | cut -d ':' -f 1)" >> $GITHUB_ENV
           echo "MIGRATION_TASK_DEFINITION_FAMILY=$(terraform output -raw migration_task_definition_family | cut -d ':' -f 1)" >> $GITHUB_ENV
     outputs:
       cluster-name: ${{ env.CLUSTER_NAME }}
+      container-name: ${{ env.CONTAINER_NAME }}
       service-name: ${{ env.SERVICE_NAME }}
       task-definition-family: ${{ env.TASK_DEFINITION_FAMILY }}
       migration-task-definition-family: ${{ env.MIGRATION_TASK_DEFINITION_FAMILY }}
@@ -313,7 +315,7 @@ jobs:
         env:
           MIGRATION_TASK_DEFINITION_FAMILY: ${{ needs.terraform-apply.outputs.migration-task-definition-family }}
           CLUSTER_NAME: ${{ needs.terraform-apply.outputs.cluster-name }}
-          SERVICE_NAME: ${{ needs.terraform-apply.outputs.service-name }}
+          CONTAINER_NAME: ${{ needs.terraform-apply.outputs.container-name }}
         run: |
           chmod +x ./deploy.sh
           ./deploy.sh
