@@ -103,7 +103,7 @@ resource "aws_ecs_task_definition" "this" {
       image        = "${var.image_registry}/${var.image_repository}:${var.image_tag}"
       memory       = var.memory
       name         = local.container_name
-      portMappings = var.port != null ? [{ containerPort = var.port, hostPort: var.port }] : []
+      portMappings = var.port != null ? [{ containerPort = var.port, hostPort: 0 }] : []
 
       environment = concat(
         [
@@ -152,7 +152,7 @@ resource "aws_ecs_task_definition" "run_migration" {
       image        = "${var.image_registry}/${var.image_repository}:${var.image_tag}"
       memory       = var.memory
       name         = local.container_name
-      portMappings = var.port != null ? [{ containerPort = var.port, hostPort: var.migration_port }] : []
+      portMappings = var.port != null ? [{ containerPort = var.port, hostPort: 0 }] : []
 
       environment = concat(
         [

@@ -33,17 +33,6 @@ resource "aws_lb_target_group" "service" {
   protocol                          = "HTTP"
   vpc_id                            = var.vpc_id
   target_type                       = "instance"
-
-  health_check {
-    enabled           = true
-    path              = "/"
-    port              = var.port
-    matcher           = 200
-    interval          = 10
-    timeout           = 5
-    healthy_threshold = 2
-
-  }
 }
 
 resource "aws_lb_listener_rule" "service" {
