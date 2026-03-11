@@ -275,6 +275,7 @@ jobs:
         working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
 
       - name: Set Environment variables
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
         run: |
           echo "CLUSTER_NAME=$(terraform output -raw cluster_name | cut -d ':' -f 1)" >> $GITHUB_ENV
           echo "SERVICE_NAME=$(terraform output -raw service_name | cut -d ':' -f 1)" >> $GITHUB_ENV
