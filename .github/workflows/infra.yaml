@@ -70,7 +70,7 @@ jobs:
           docker image pull $REGISTRY/$REPOSITORY:$IMAGE_TAG
 
       - run: |
-          docker-compose up -d
+          docker compose up -d
 
       - name: check connectivit between app and database and run migration
         env:
