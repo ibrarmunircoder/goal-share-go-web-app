@@ -12,6 +12,9 @@ env:
 
 jobs:
   terraform-check:
+    concurrency:
+      cancel-in-progress: false
+      group: tf-lock
     name: Validate the terraform configuration files
     runs-on: ubuntu-latest
     # this is required for authenticating to AWS via the OIDC Provider we set up
@@ -59,6 +62,118 @@ jobs:
 
       - name: Terraform validate
         run: terraform validate
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
+
+  terraform-plan:
+    needs: terraform-check
+    if: github.event_name == 'push' && (github.ref_name == 'staging' || github.ref_name == 'production')
+    name: Generate Terraform plan
+    concurrency:
+      cancel-in-progress: false
+      group: tf-lock
+    runs-on: ubuntu-latest
+    # this is required for authenticating to AWS via the OIDC Provider we set up
+    permissions:
+      id-token: write
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::287773672913:role/goal-share-go-app-ci-cd
+          role-session-name: GithubActionsSession
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.3
+
+      - name: Terraform initialization
+        run: terraform init
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
+
+      - name: Set Environment Variables
+        id: env-vars
+        run: |
+          echo "WORKSPACE_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
+          echo "TF_VAR_FILE=${{ github.ref_name }}.tfvars" >> $GITHUB_ENV
+
+      - name: Select Terraform workspace
+        run: |
+          terraform workspace select $WORKSPACE_NAME || terraform workspace new $WORKSPACE_NAME
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -var-file=$TF_VAR_FILE -out="terraform.tfplan"
+        continue-on-error: true
+
+      - name: Upload Plan Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tf-plan-${{ env.WORKSPACE_NAME }}
+          path: ${{ env.TERRAFORM_WORKING_DIR }}/terraform.tfplan
+
+    outputs:
+      tf_var_file: ${{ env.TF_VAR_FILE }}
+      workspace_name: ${{ env.WORKSPACE_NAME }}
+
+  terraform-apply:
+    needs: terraform-plan
+    if: github.event_name == 'push' && (github.ref_name == 'staging' || github.ref_name == 'production')
+    name: Apply Terraform plan
+    concurrency:
+      cancel-in-progress: false
+      group: tf-lock
+    runs-on: ubuntu-latest
+    # this is required for authenticating to AWS via the OIDC Provider we set up
+    permissions:
+      id-token: write
+      contents: write
+    env:
+      WORKSPACE_NAME: ${{ needs.terraform-plan.outputs.workspace_name }}
+      TF_VAR_FILE: ${{ needs.terraform-plan.outputs.tf_var_file }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::287773672913:role/goal-share-go-app-ci-cd
+          role-session-name: GithubActionsSession
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.3
+
+      - name: Terraform initialization
+        run: terraform init
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
+
+      - name: Select Terraform workspace
+        run: |
+          terraform workspace select $WORKSPACE_NAME || terraform workspace new $WORKSPACE_NAME
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
+
+      - name: Download Plan Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-${{ env.WORKSPACE_NAME }}
+          path: .
+
+      - run: mv terraform.tfplan $TERRAFORM_WORKING_DIR/terraform.tfplan
+
+      - run: terraform init
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
+
+      - run: terraform apply -var-file=$TF_VAR_FILE "terraform.tfplan"
         working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
 
   build-push:
