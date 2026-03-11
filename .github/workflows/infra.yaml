@@ -312,9 +312,11 @@ jobs:
       - name: Apply migration
         env:
           MIGRATION_TASK_DEFINITION_FAMILY: ${{ needs.terraform-apply.outputs.migration-task-definition-family }}
-          CLUSTER_NAME: ${{ needs.terraform-apply.outputs.cluster-nam }}
-          SERVICE_NAME: ${{ needs.terraform-apply.outputs.service-nam }}
-        run: ./deploy.sh
+          CLUSTER_NAME: ${{ needs.terraform-apply.outputs.cluster-name }}
+          SERVICE_NAME: ${{ needs.terraform-apply.outputs.service-name }}
+        run: |
+          chmod +x ./deploy.sh
+          ./deploy.sh
 
       - name: Download Plan Artifact
         uses: actions/download-artifact@v4
@@ -337,4 +339,4 @@ jobs:
         with:
           task-definition: ${{ steps.render-web-container.outputs.task-definition }}
           service: ${{ needs.terraform-apply.outputs.service-name }}
-          cluster: ${{ needs.terraform-apply.outputs.cluster-nam }}
+          cluster: ${{ needs.terraform-apply.outputs.cluster-name }}
