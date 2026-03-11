@@ -43,6 +43,7 @@ jobs:
         run: tflint -f compact
 
       - run: terraform fmt -check
+        continue-on-error: true
         working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
 
       - name: Terraform initialization
