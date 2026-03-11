@@ -10,6 +10,10 @@ output "migration_task_definition_family" {
   value = aws_ecs_task_definition.run_migration.family
 }
 
+output "container_name" {
+  value = local.container_name
+}
+
 output "cluster_name" {
   value = aws_ecs_cluster.this.name
 }
