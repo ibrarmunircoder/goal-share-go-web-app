@@ -1,6 +1,7 @@
 name: Infra and application deployment
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches: [main, staging, production]
