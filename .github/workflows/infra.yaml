@@ -41,7 +41,7 @@ jobs:
     needs:
       - build-push
     name: Test the image and run migrations locally
-    runs-on: ubuntu-lates
+    runs-on: ubuntu-latest
     # this is required for authenticating to AWS via the OIDC Provider we set up
     permissions:
       id-token: write
