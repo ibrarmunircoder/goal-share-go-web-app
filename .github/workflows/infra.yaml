@@ -327,13 +327,14 @@ jobs:
           path: .
 
       - name: Set Image URI environment variable
-        run: echo "IMAGE_URI=$(cat image-uri.txt | cut -d "=" -f 1)" >> $GITHUB_ENV
+        run: echo "IMAGE_URI=$(cat image-uri.txt | cut -d "=" -f 2)" >> $GITHUB_ENV
 
       - name: Render Amazon ECS task definition
         id: render-web-container
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition-family: ${{ needs.terraform-apply.outputs.task-definition-family }}
+          container-name: ${{ needs.terraform-apply.outputs.container-name }}
           image: ${{ env.IMAGE_URI }}
 
       - name: Deploy to Amazon ECS service
