@@ -115,7 +115,7 @@ jobs:
       - name: Upload Plan Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tf-plan-${{ env.WORKSPACE_NAME }}
+          name: tfplan-${{ env.WORKSPACE_NAME }}
           path: ${{ env.TERRAFORM_WORKING_DIR }}/terraform.tfplan
 
     outputs:
