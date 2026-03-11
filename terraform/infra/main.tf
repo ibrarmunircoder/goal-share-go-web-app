@@ -58,10 +58,10 @@ module "cluser" {
 module "database" {
   source = "./modules/database"
 
-  env = var.env
+  env    = var.env
   vpc_id = module.networking.vpc_id
 
-  db_subnets = module.networking.db_subnet_ids
-  prefix = var.project_name
+  db_subnets     = module.networking.db_subnet_ids
+  prefix         = var.project_name
   ecs_node_sg_id = module.cluser.ecs_node_sg_id
 }
