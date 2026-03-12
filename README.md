@@ -4,6 +4,15 @@ Production-ready deployment of a Go web application on AWS ECS (EC2 launch type)
 
 ---
 
+### 🎬 Live Demo:
+
+![Home Page](./screenshots/image-1.png)
+![Browse Page](./screenshots/image-2.png)
+![Profile Page](./screenshots/image-3.png)
+![CI/CD Pipeline](./screenshots/image-4.png)
+
+---
+
 ### 📌 Project Overview:
 
 This project demonstrates how to design and deploy a **production-ready cloud infrastructure** for a Go web application using AWS and Terraform.
@@ -13,6 +22,8 @@ The infrastructure follows **cloud-native best practices** including containeriz
 The application itself is a platform where users can **set, track, and share life goals and aspirations**.
 
 The entire system is deployed using **Terraform modules and workspaces**, enabling multiple environments such as **development, staging, and production**.
+
+---
 
 ### Architecture Diagram:
 
