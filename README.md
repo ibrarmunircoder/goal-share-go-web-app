@@ -14,6 +14,10 @@ The application itself is a platform where users can **set, track, and share lif
 
 The entire system is deployed using **Terraform modules and workspaces**, enabling multiple environments such as **development, staging, and production**.
 
+### Architecture Diagram:
+
+![architecture diagram](./screenshots/diagram.png)
+
 ---
 
 ### 🚀 Key Features
@@ -44,15 +48,6 @@ The entire system is deployed using **Terraform modules and workspaces**, enabli
 
 ---
 
-### 🔗 Useful Resources:
-
-1- https://oneuptime.com/blog/post/2026-02-23-create-target-tracking-scaling-policies-in-terraform/view
-2- https://oneuptime.com/blog/post/2026-02-12-ecs-capacity-providers/view
-3- https://oneuptime.com/blog/post/2026-02-23-how-to-use-the-cidrsubnets-function-in-terraform/view
-4- https://medium.com/@vladkens/aws-ecs-cluster-on-ec2-with-terraform-2023-fdb9f6b7db07
-
----
-
 ### 🎯 Learning Objectives:
 
 - Learn how to containerize a Go application
@@ -66,6 +61,15 @@ The entire system is deployed using **Terraform modules and workspaces**, enabli
 - Implement CI/CD pipelines using Github Actions
 - Learn how to update the container image URI in the ECS task definition with the latest version
 - Learn how to trigger a new ECS deployment after building, testing, and updating infrastructure
+
+---
+
+### 🔗 Useful Resources:
+
+1- https://oneuptime.com/blog/post/2026-02-23-create-target-tracking-scaling-policies-in-terraform/view
+2- https://oneuptime.com/blog/post/2026-02-12-ecs-capacity-providers/view
+3- https://oneuptime.com/blog/post/2026-02-23-how-to-use-the-cidrsubnets-function-in-terraform/view
+4- https://medium.com/@vladkens/aws-ecs-cluster-on-ec2-with-terraform-2023-fdb9f6b7db07
 
 ---
 
