@@ -103,7 +103,7 @@ resource "aws_ecs_task_definition" "this" {
       image        = "${var.image_registry}/${var.image_repository}:${var.image_tag}"
       memory       = var.memory
       name         = local.container_name
-      portMappings = var.port != null ? [{ containerPort = var.port, hostPort: 0 }] : []
+      portMappings = var.port != null ? [{ containerPort = var.port, hostPort : 0 }] : []
 
       environment = concat(
         [
@@ -152,7 +152,7 @@ resource "aws_ecs_task_definition" "run_migration" {
       image        = "${var.image_registry}/${var.image_repository}:${var.image_tag}"
       memory       = var.memory
       name         = local.container_name
-      portMappings = var.port != null ? [{ containerPort = var.port, hostPort: 0 }] : []
+      portMappings = var.port != null ? [{ containerPort = var.port, hostPort : 0 }] : []
 
       environment = concat(
         [
@@ -192,10 +192,10 @@ resource "aws_ecs_task_definition" "run_migration" {
 
 
 resource "aws_ecs_service" "this" {
-  cluster         = aws_ecs_cluster.this.id
-  desired_count   = 1
-  name            = "${var.prefix}-${var.env}"
-  task_definition = aws_ecs_task_definition.this.arn
+  cluster              = aws_ecs_cluster.this.id
+  desired_count        = 1
+  name                 = "${var.prefix}-${var.env}"
+  task_definition      = aws_ecs_task_definition.this.arn
   force_new_deployment = true
 
   capacity_provider_strategy {
