@@ -111,7 +111,7 @@ jobs:
     needs: test
     concurrency:
       cancel-in-progress: false
-      group: tf-lock
+      group: tf-lock-${{ github.ref_name }}
     name: Validate the terraform configuration files
     runs-on: ubuntu-latest
     # this is required for authenticating to AWS via the OIDC Provider we set up
@@ -167,7 +167,7 @@ jobs:
     name: Generate Terraform plan
     concurrency:
       cancel-in-progress: false
-      group: tf-lock
+      group: tf-lock-${{ github.ref_name }}
     runs-on: ubuntu-latest
     # this is required for authenticating to AWS via the OIDC Provider we set up
     permissions:
@@ -226,7 +226,7 @@ jobs:
     name: Apply Terraform plan
     concurrency:
       cancel-in-progress: false
-      group: tf-lock
+      group: tf-lock-${{ github.ref_name }}
     runs-on: ubuntu-latest
     # this is required for authenticating to AWS via the OIDC Provider we set up
     permissions:
@@ -293,7 +293,7 @@ jobs:
     needs: terraform-apply
     concurrency:
       cancel-in-progress: false
-      group: tf-lock
+      group: tf-lock-${{ github.ref_name }}
     runs-on: ubuntu-latest
     # this is required for authenticating to AWS via the OIDC Provider we set up
     permissions:
