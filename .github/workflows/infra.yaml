@@ -1,20 +1,28 @@
 name: Infra and application deployment
 
 on:
-  pull_request:
+  workflow_dispatch:
   push:
-    branches: [staging, production]
+    branches: [main, staging, production]
+
+env:
+  IMAGE_REPOSITORY: goal-share
+  TERRAFORM_WORKING_DIR: ./terraform/infra
 
 jobs:
   build-push:
     name: Build and Push docker image to ECR repository
     runs-on: ubuntu-latest
+    # this is required for authenticating to AWS via the OIDC Provider we set up
+    permissions:
+      id-token: write
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: us-east-1
           role-to-assume: arn:aws:iam::287773672913:role/goal-share-go-app-ci-cd
@@ -27,7 +35,7 @@ jobs:
       - name: Build, tag, and push docker image to Amazon ECR
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REPOSITORY: goal-share
+          REPOSITORY: ${{ env.IMAGE_REPOSITORY }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
           docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG .
@@ -36,7 +44,11 @@ jobs:
     needs:
       - build-push
     name: Test the image and run migrations locally
-    runs-on: ubuntu-lates
+    runs-on: ubuntu-latest
+    # this is required for authenticating to AWS via the OIDC Provider we set up
+    permissions:
+      id-token: write
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -55,15 +67,15 @@ jobs:
       - name: Pull the image
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REPOSITORY: goal-share
+          REPOSITORY: ${{ env.IMAGE_REPOSITORY }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
           docker image pull $REGISTRY/$REPOSITORY:$IMAGE_TAG
+      - name: Run the postgres container
+        run: |
+          docker run -d --name postgres --env POSTGRES_PASSWORD=password --network "host" -p 5432:5432 -v postgres:/var/lib/postgresql/data postgres:alpine
 
-      - run: |
-          docker-compose up -d
-
-      - name: check connectivit between app and database and run migration
+      - name: Check connectivit between app and database and run migration
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           REPOSITORY: goal-share
@@ -80,3 +92,254 @@ jobs:
           docker container run --entrypoint "goose" --env "GOOSE_DBSTRING" --env "GOOSE_DRIVER" --network "host" --rm $REGISTRY/$REPOSITORY:$IMAGE_TAG -dir migrations validate
 
           docker container run --entrypoint "goose" --env "GOOSE_DBSTRING" --env "GOOSE_DRIVER" --network "host" --rm $REGISTRY/$REPOSITORY:$IMAGE_TAG -dir migrations up
+
+      - name: Create image artifact
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: goal-share
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          echo "IMAGE_URI=$REGISTRY/$REPOSITORY:$IMAGE_TAG" > image-uri.txt
+
+      - name: Upload Plan Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-uri-${{ github.sha }}
+          path: image-uri.txt
+
+  terraform-check:
+    needs: test
+    concurrency:
+      cancel-in-progress: false
+      group: tf-lock
+    name: Validate the terraform configuration files
+    runs-on: ubuntu-latest
+    # this is required for authenticating to AWS via the OIDC Provider we set up
+    permissions:
+      id-token: write
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::287773672913:role/goal-share-go-app-ci-cd
+          role-session-name: GithubActionsSession
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.3
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v3
+        with:
+          tflint_version: v0.52.0
+
+      - name: Init TFLint
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: tflint --init
+
+      - name: Run TFLint
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: tflint -f compact
+
+      - run: terraform fmt -check
+        continue-on-error: true
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
+
+      - name: Terraform initialization
+        run: terraform init
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
+
+      - name: Terraform validate
+        run: terraform validate
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
+
+  terraform-plan:
+    needs: terraform-check
+    if: github.event_name == 'push' && (github.ref_name == 'staging' || github.ref_name == 'production')
+    name: Generate Terraform plan
+    concurrency:
+      cancel-in-progress: false
+      group: tf-lock
+    runs-on: ubuntu-latest
+    # this is required for authenticating to AWS via the OIDC Provider we set up
+    permissions:
+      id-token: write
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::287773672913:role/goal-share-go-app-ci-cd
+          role-session-name: GithubActionsSession
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.3
+
+      - name: Terraform initialization
+        run: terraform init
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
+
+      - name: Set Environment Variables
+        id: env-vars
+        run: |
+          echo "WORKSPACE_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
+          echo "TF_VAR_FILE=${{ github.ref_name }}.tfvars" >> $GITHUB_ENV
+
+      - name: Select Terraform workspace
+        run: |
+          terraform workspace select $WORKSPACE_NAME || terraform workspace new $WORKSPACE_NAME
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -var-file=$TF_VAR_FILE -out="terraform.tfplan"
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
+        continue-on-error: true
+
+      - name: Upload Plan Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ env.WORKSPACE_NAME }}
+          path: ${{ env.TERRAFORM_WORKING_DIR }}/terraform.tfplan
+
+    outputs:
+      tf_var_file: ${{ env.TF_VAR_FILE }}
+      workspace_name: ${{ env.WORKSPACE_NAME }}
+
+  terraform-apply:
+    needs: terraform-plan
+    if: github.event_name == 'push' && (github.ref_name == 'staging' || github.ref_name == 'production')
+    name: Apply Terraform plan
+    concurrency:
+      cancel-in-progress: false
+      group: tf-lock
+    runs-on: ubuntu-latest
+    # this is required for authenticating to AWS via the OIDC Provider we set up
+    permissions:
+      id-token: write
+      contents: write
+    env:
+      WORKSPACE_NAME: ${{ needs.terraform-plan.outputs.workspace_name }}
+      TF_VAR_FILE: ${{ needs.terraform-plan.outputs.tf_var_file }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::287773672913:role/goal-share-go-app-ci-cd
+          role-session-name: GithubActionsSession
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.3
+
+      - name: Terraform initialization
+        run: terraform init
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
+
+      - name: Select Terraform workspace
+        run: |
+          terraform workspace select $WORKSPACE_NAME || terraform workspace new $WORKSPACE_NAME
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
+
+      - name: Download Plan Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-${{ env.WORKSPACE_NAME }}
+          path: .
+
+      - run: mv terraform.tfplan $TERRAFORM_WORKING_DIR/terraform.tfplan
+
+      - run: terraform init
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
+
+      - run: terraform apply -var-file=$TF_VAR_FILE "terraform.tfplan"
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
+
+      - name: Set Environment variables
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
+        run: |
+          echo "CLUSTER_NAME=$(terraform output -raw cluster_name | cut -d ':' -f 1)" >> $GITHUB_ENV
+          echo "SERVICE_NAME=$(terraform output -raw service_name | cut -d ':' -f 1)" >> $GITHUB_ENV
+          echo "CONTAINER_NAME=$(terraform output -raw container_name | cut -d ':' -f 1)" >> $GITHUB_ENV
+          echo "TASK_DEFINITION_FAMILY=$(terraform output -raw task_definition_family | cut -d ':' -f 1)" >> $GITHUB_ENV
+          echo "MIGRATION_TASK_DEFINITION_FAMILY=$(terraform output -raw migration_task_definition_family | cut -d ':' -f 1)" >> $GITHUB_ENV
+    outputs:
+      cluster-name: ${{ env.CLUSTER_NAME }}
+      container-name: ${{ env.CONTAINER_NAME }}
+      service-name: ${{ env.SERVICE_NAME }}
+      task-definition-family: ${{ env.TASK_DEFINITION_FAMILY }}
+      migration-task-definition-family: ${{ env.MIGRATION_TASK_DEFINITION_FAMILY }}
+
+  force-ecs-deployment:
+    needs: terraform-apply
+    concurrency:
+      cancel-in-progress: false
+      group: tf-lock
+    runs-on: ubuntu-latest
+    # this is required for authenticating to AWS via the OIDC Provider we set up
+    permissions:
+      id-token: write
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::287773672913:role/goal-share-go-app-ci-cd
+          role-session-name: GithubActionsSession
+
+      - name: Apply migration
+        env:
+          MIGRATION_TASK_DEFINITION_FAMILY: ${{ needs.terraform-apply.outputs.migration-task-definition-family }}
+          CLUSTER_NAME: ${{ needs.terraform-apply.outputs.cluster-name }}
+          CONTAINER_NAME: ${{ needs.terraform-apply.outputs.container-name }}
+        run: |
+          chmod +x ./deploy.sh
+          ./deploy.sh
+
+      - name: Download Plan Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: image-uri-${{ github.sha }}
+          path: .
+
+      - name: Set Image URI environment variable
+        run: echo "IMAGE_URI=$(cat image-uri.txt | cut -d "=" -f 2)" >> $GITHUB_ENV
+
+      - name: Render Amazon ECS task definition
+        id: render-web-container
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition-family: ${{ needs.terraform-apply.outputs.task-definition-family }}
+          container-name: ${{ needs.terraform-apply.outputs.container-name }}
+          image: ${{ env.IMAGE_URI }}
+
+      - name: Deploy to Amazon ECS service
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-web-container.outputs.task-definition }}
+          service: ${{ needs.terraform-apply.outputs.service-name }}
+          cluster: ${{ needs.terraform-apply.outputs.cluster-name }}
